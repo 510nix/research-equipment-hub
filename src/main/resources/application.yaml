@@ -1,3 +1,15 @@
 spring:
-  application:
-    name: Research Equipment Hub
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/research_hub}
+    username: ${SPRING_DATASOURCE_USERNAME:user_name}
+    password: ${SPRING_DATASOURCE_PASSWORD:password123}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  security:
+    user:
+      name: admin
+      password: password123
