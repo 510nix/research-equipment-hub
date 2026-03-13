@@ -1,10 +1,10 @@
 package com.kuet.hub.controller;
 
-import com.kuet.hub.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,14 +12,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
-@WebMvcTest(AuthController.class)
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
 class AuthControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private UserService userService;
 
     @Test
     void loginPage_returnsOk() throws Exception {
@@ -46,7 +45,6 @@ class AuthControllerIntegrationTest {
                         .param("role", "BORROWER"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("auth/register"))
-                .andExpect(model().attributeHasFieldErrors("registrationDto",
-                        "username", "email", "password"));
+                .andExpect(model().attributeHasFieldErrors("registrationDto", "username", "email", "password"));
     }
 }
