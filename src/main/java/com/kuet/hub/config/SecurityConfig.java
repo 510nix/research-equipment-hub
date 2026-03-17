@@ -46,6 +46,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/auth/register", "/auth/login", "/css/**", "/js/**", "/lib/**", "/images/**").permitAll()
                         .requestMatchers("/browse", "/browse/**", "/my-requests", "/my-requests/**").hasRole("BORROWER")
+                        .requestMatchers("/requests/**").authenticated() // Allow authenticated users; @PreAuthorize handles specific roles
                         .requestMatchers("/provider/**").hasRole("PROVIDER")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

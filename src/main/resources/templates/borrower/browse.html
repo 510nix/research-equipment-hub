@@ -67,9 +67,14 @@
                         </small>
                     </div>
 
-                    <a th:href="@{/browse/{id}(id=${item.id})}" class="btn btn-sm btn-outline-primary w-100">
-                        View Details & Request
-                    </a>
+                    <div class="d-grid gap-2">
+                        <a th:href="@{/browse/{id}(id=${item.id})}" class="btn btn-sm btn-outline-primary">
+                            👁️ View Details
+                        </a>
+                        <a th:href="@{/requests/new/{id}(id=${item.id})}" class="btn btn-sm btn-primary">
+                            ✉️ Request This Item
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
