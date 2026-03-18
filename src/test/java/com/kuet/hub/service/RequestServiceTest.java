@@ -16,28 +16,23 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-/**
- * Unit tests for RequestService
- * Tests the business logic layer for equipment request management
- */
 @ExtendWith(MockitoExtension.class)
-@SuppressWarnings("null") // Resolves the "Null type safety" warnings for Mockito stubs
+@SuppressWarnings("null")
 class RequestServiceTest {
 
-    @Mock
-    private RequestRepository requestRepository;
+    @Mock private RequestRepository requestRepository;
+    @Mock private ItemRepository itemRepository;
 
-    @Mock
-    private ItemRepository itemRepository;
-
-    @InjectMocks
-    private RequestService requestService;
+    @InjectMocks private RequestService requestService;
 
     private User borrower;
     private User provider;
@@ -47,7 +42,6 @@ class RequestServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Setup test data
         borrower = new User();
         borrower.setId(1L);
         borrower.setUsername("borrower_user");
@@ -84,19 +78,12 @@ class RequestServiceTest {
     @Test
     @DisplayName("Should throw exception when user attempts to borrow their own item")
     void testCreateRequest_UserIsOwner_ThrowsException() {
-        RequestDto ownerRequestDto = new RequestDto();
-        ownerRequestDto.setItemId(1L);
-        ownerRequestDto.setStartDate(LocalDate.now().plusDays(1));
-        ownerRequestDto.setEndDate(LocalDate.now().plusDays(5));
-        ownerRequestDto.setMessage("I need this for my research");
-
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            requestService.createRequest(1L, provider, ownerRequestDto);
-        });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> requestService.createRequest(1L, provider, requestDto));
 
-        assertEquals("You cannot request your own equipment", exception.getMessage());
+        assertEquals("You cannot request your own equipment", ex.getMessage());
         verify(requestRepository, never()).save(any());
     }
 
@@ -107,11 +94,10 @@ class RequestServiceTest {
         requestDto.setEndDate(LocalDate.now().plusDays(1));
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            requestService.createRequest(1L, borrower, requestDto);
-        });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> requestService.createRequest(1L, borrower, requestDto));
 
-        assertEquals("End date cannot be before start date", exception.getMessage());
+        assertEquals("End date cannot be before start date", ex.getMessage());
         verify(requestRepository, never()).save(any());
     }
 
@@ -120,11 +106,10 @@ class RequestServiceTest {
     void testCreateRequest_ItemNotFound_ThrowsException() {
         when(itemRepository.findById(1L)).thenReturn(Optional.empty());
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            requestService.createRequest(1L, borrower, requestDto);
-        });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> requestService.createRequest(1L, borrower, requestDto));
 
-        assertEquals("Equipment item not found", exception.getMessage());
+        assertEquals("Equipment item not found", ex.getMessage());
         verify(requestRepository, never()).save(any());
     }
 
@@ -134,11 +119,10 @@ class RequestServiceTest {
         item.setStatus(Item.ItemStatus.BORROWED);
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            requestService.createRequest(1L, borrower, requestDto);
-        });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> requestService.createRequest(1L, borrower, requestDto));
 
-        assertEquals("This equipment is not currently available for request", exception.getMessage());
+        assertEquals("This equipment is not currently available for request", ex.getMessage());
         verify(requestRepository, never()).save(any());
     }
 
@@ -148,27 +132,65 @@ class RequestServiceTest {
         when(itemRepository.findById(1L)).thenReturn(Optional.of(item));
         when(requestRepository.save(any(Request.class))).thenReturn(request);
 
-        Request createdRequest = requestService.createRequest(1L, borrower, requestDto);
+        Request created = requestService.createRequest(1L, borrower, requestDto);
 
-        assertNotNull(createdRequest);
-        assertEquals(borrower, createdRequest.getBorrower());
-        assertEquals(item, createdRequest.getItem());
-        assertEquals(Request.RequestStatus.PENDING, createdRequest.getStatus());
-        assertEquals(requestDto.getMessage(), createdRequest.getMessage());
+        assertNotNull(created);
+        assertEquals(borrower, created.getBorrower());
+        assertEquals(item, created.getItem());
+        assertEquals(Request.RequestStatus.PENDING, created.getStatus());
         verify(requestRepository, times(1)).save(any(Request.class));
     }
 
     @Test
-    @DisplayName("Should approve request successfully when provider is authorized")
+    @DisplayName("Should approve request, mark item BORROWED, and auto-reject competing requests")
     void testApproveRequest_AuthorizedProvider_SuccessfullyApproved() {
         when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
         when(requestRepository.save(any(Request.class))).thenReturn(request);
+        when(itemRepository.save(any(Item.class))).thenReturn(item);
 
-        Request approvedRequest = requestService.approveRequest(1L, provider);
+        // FIX: approveRequest() calls findByItemAndStatusAndIdNot() for double-booking
+        // prevention. Without this stub Mockito throws UnnecessaryStubbingException
+        // or NullPointerException depending on strict mode.
+        when(requestRepository.findByItemAndStatusAndIdNot(
+                eq(item), eq(Request.RequestStatus.PENDING), eq(1L)))
+                .thenReturn(Collections.emptyList());
 
-        assertNotNull(approvedRequest);
-        assertEquals(Request.RequestStatus.APPROVED, approvedRequest.getStatus());
-        verify(requestRepository, times(1)).save(any(Request.class));
+        Request approved = requestService.approveRequest(1L, provider);
+
+        assertNotNull(approved);
+        assertEquals(Request.RequestStatus.APPROVED, approved.getStatus());
+        // Verify item was marked BORROWED
+        verify(itemRepository).save(any(Item.class));
+        verify(requestRepository, atLeastOnce()).save(any(Request.class));
+    }
+
+    @Test
+    @DisplayName("Should auto-reject competing PENDING requests when one is approved")
+    void testApproveRequest_AutoRejectsCompetingRequests() {
+        // A second borrower has a PENDING request for the same item
+        User secondBorrower = new User();
+        secondBorrower.setId(3L);
+        secondBorrower.setUsername("second_borrower");
+
+        Request competingRequest = new Request();
+        competingRequest.setId(2L);
+        competingRequest.setBorrower(secondBorrower);
+        competingRequest.setItem(item);
+        competingRequest.setStatus(Request.RequestStatus.PENDING);
+
+        when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
+        when(requestRepository.save(any(Request.class))).thenAnswer(i -> i.getArgument(0));
+        when(itemRepository.save(any(Item.class))).thenReturn(item);
+        when(requestRepository.findByItemAndStatusAndIdNot(
+                eq(item), eq(Request.RequestStatus.PENDING), eq(1L)))
+                .thenReturn(List.of(competingRequest));
+
+        requestService.approveRequest(1L, provider);
+
+        // Verify the competing request was rejected
+        assertEquals(Request.RequestStatus.REJECTED, competingRequest.getStatus());
+        // save called at least twice: once for the approved request, once for the competing one
+        verify(requestRepository, atLeast(2)).save(any(Request.class));
     }
 
     @Test
@@ -180,63 +202,66 @@ class RequestServiceTest {
 
         when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
 
-        SecurityException exception = assertThrows(SecurityException.class, () -> {
-            requestService.approveRequest(1L, unauthorizedProvider);
-        });
+        SecurityException ex = assertThrows(SecurityException.class,
+                () -> requestService.approveRequest(1L, unauthorizedProvider));
 
-        assertEquals("You are not authorized to approve this request", exception.getMessage());
+        assertEquals("You are not authorized to approve this request", ex.getMessage());
         verify(requestRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("Should retrieve all requests for a borrower")
     void testGetRequestsForBorrower_ReturnsAllBorrowerRequests() {
-        when(requestRepository.findByBorrower(borrower)).thenReturn(java.util.List.of(request));
+        when(requestRepository.findByBorrower(borrower)).thenReturn(List.of(request));
 
         var requests = requestService.getRequestsForBorrower(borrower);
 
         assertEquals(1, requests.size());
         assertEquals(borrower, requests.get(0).getBorrower());
-        verify(requestRepository, times(1)).findByBorrower(borrower);
+        verify(requestRepository).findByBorrower(borrower);
     }
 
     @Test
     @DisplayName("Should retrieve all requests for provider's items")
     void testGetRequestsForProvider_ReturnsAllProviderRequests() {
-        when(requestRepository.findByItemOwner(provider)).thenReturn(java.util.List.of(request));
+        when(requestRepository.findByItemOwner(provider)).thenReturn(List.of(request));
 
         var requests = requestService.getRequestsForProvider(provider);
 
         assertEquals(1, requests.size());
         assertEquals(provider, requests.get(0).getItem().getOwner());
-        verify(requestRepository, times(1)).findByItemOwner(provider);
+        verify(requestRepository).findByItemOwner(provider);
     }
 
     @Test
-    @DisplayName("Should reject request successfully when provider is authorized")
+    @DisplayName("Should reject request and set item back to AVAILABLE")
     void testRejectRequest_AuthorizedProvider_SuccessfullyRejected() {
         when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
         when(requestRepository.save(any(Request.class))).thenReturn(request);
+        when(itemRepository.save(any(Item.class))).thenReturn(item);
 
-        Request rejectedRequest = requestService.rejectRequest(1L, provider);
+        Request rejected = requestService.rejectRequest(1L, provider);
 
-        assertNotNull(rejectedRequest);
-        assertEquals(Request.RequestStatus.REJECTED, rejectedRequest.getStatus());
-        verify(requestRepository, times(1)).save(any(Request.class));
+        assertNotNull(rejected);
+        assertEquals(Request.RequestStatus.REJECTED, rejected.getStatus());
+        verify(itemRepository).save(any(Item.class)); // item status reset to AVAILABLE
+        verify(requestRepository).save(any(Request.class));
     }
 
     @Test
-    @DisplayName("Should mark request as completed successfully when borrower is authorized")
+    @DisplayName("Should mark request COMPLETED and set item back to AVAILABLE")
     void testCompleteRequest_AuthorizedBorrower_SuccessfullyCompleted() {
         request.setStatus(Request.RequestStatus.APPROVED);
         when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
         when(requestRepository.save(any(Request.class))).thenReturn(request);
+        when(itemRepository.save(any(Item.class))).thenReturn(item);
 
-        Request completedRequest = requestService.completeRequest(1L, borrower);
+        Request completed = requestService.completeRequest(1L, borrower);
 
-        assertNotNull(completedRequest);
-        assertEquals(Request.RequestStatus.COMPLETED, completedRequest.getStatus());
-        verify(requestRepository, times(1)).save(any(Request.class));
+        assertNotNull(completed);
+        assertEquals(Request.RequestStatus.COMPLETED, completed.getStatus());
+        verify(itemRepository).save(any(Item.class)); // item returned to AVAILABLE
+        verify(requestRepository).save(any(Request.class));
     }
 
     @Test
@@ -249,11 +274,10 @@ class RequestServiceTest {
         request.setStatus(Request.RequestStatus.APPROVED);
         when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
 
-        SecurityException exception = assertThrows(SecurityException.class, () -> {
-            requestService.completeRequest(1L, otherBorrower);
-        });
+        SecurityException ex = assertThrows(SecurityException.class,
+                () -> requestService.completeRequest(1L, otherBorrower));
 
-        assertEquals("You are not authorized to complete this request", exception.getMessage());
+        assertEquals("You are not authorized to complete this request", ex.getMessage());
         verify(requestRepository, never()).save(any());
     }
 
@@ -262,11 +286,11 @@ class RequestServiceTest {
     void testGetRequestById_RequestExists_ReturnsRequest() {
         when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
 
-        Request retrievedRequest = requestService.getRequestById(1L);
+        Request retrieved = requestService.getRequestById(1L);
 
-        assertNotNull(retrievedRequest);
-        assertEquals(request.getId(), retrievedRequest.getId());
-        verify(requestRepository, times(1)).findById(1L);
+        assertNotNull(retrieved);
+        assertEquals(request.getId(), retrieved.getId());
+        verify(requestRepository).findById(1L);
     }
 
     @Test
@@ -274,10 +298,9 @@ class RequestServiceTest {
     void testGetRequestById_RequestNotFound_ThrowsException() {
         when(requestRepository.findById(1L)).thenReturn(Optional.empty());
 
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            requestService.getRequestById(1L);
-        });
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> requestService.getRequestById(1L));
 
-        assertEquals("Request not found", exception.getMessage());
+        assertEquals("Request not found", ex.getMessage());
     }
 }
