@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class DeleteItem_NonOwner_Test {
 
     @Mock private ItemRepository itemRepository;

@@ -1,9 +1,11 @@
 package com.kuet.hub.config;
 
 import com.kuet.hub.entity.Category;
+import com.kuet.hub.entity.Item;
 import com.kuet.hub.entity.Role;
 import com.kuet.hub.entity.User;
 import com.kuet.hub.repository.CategoryRepository;
+import com.kuet.hub.repository.ItemRepository;
 import com.kuet.hub.repository.RoleRepository;
 import com.kuet.hub.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final ItemRepository itemRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -65,10 +68,32 @@ public class DataInitializer implements CommandLineRunner {
             admin.setEmail("admin@university.edu");
             admin.setPassword(passwordEncoder.encode("admin123"));
             admin.setEnabled(true);
+            
+            final User finalAdmin = admin;
             roleRepository.findByName(Role.RoleName.ROLE_ADMIN)
-                    .ifPresent(role -> admin.getRoles().add(role));
+                    .ifPresent(role -> finalAdmin.getRoles().add(role));
             userRepository.save(admin);
             log.info("[STABILITY] Admin user initialized");
+            
+            // Initialize Sample Items for Admin Provider
+            if (itemRepository.findByOwner(admin).isEmpty()) {
+                log.info("[STABILITY] Creating sample items for admin user...");
+                
+                Category firstCategory = categoryRepository.findAll().stream().findFirst().orElse(null);
+                if (firstCategory != null) {
+                    Item sampleItem = new Item();
+                    sampleItem.setTitle("High-Power Microscope");
+                    sampleItem.setDescription("Professional laboratory microscope for research purposes. 1000x magnification, excellent condition.");
+                    sampleItem.setCategory(firstCategory);
+                    sampleItem.setOwner(admin);
+                    sampleItem.setStatus(Item.ItemStatus.AVAILABLE);
+                    sampleItem.setCondition(Item.Condition.NEW);
+                    itemRepository.save(sampleItem);
+                    log.info("[STABILITY] Sample item created: High-Power Microscope");
+                } else {
+                    log.warn("[STABILITY] No categories found. Skipping sample item creation.");
+                }
+            }
         }
         
         log.info("[STABILITY] DataInitializer completed successfully!");

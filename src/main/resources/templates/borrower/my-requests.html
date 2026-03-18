@@ -110,11 +110,11 @@
         </div>
 
         <!-- Statistics Row -->
-        <div class="row mb-4" th:unless="${#lists.isEmpty(requests)}">
+        <div class="row mb-4" th:if="${not #lists.isEmpty(requests)}">
             <div class="col-md-3">
                 <div class="card text-center">
                     <div class="card-body">
-                        <div class="fs-4 fw-bold text-primary" th:text="${requestCount}">0</div>
+                        <div class="fs-4 fw-bold text-primary" th:text="${requestCount ?: #lists.size(requests)}">0</div>
                         <div class="text-muted">Total Requests</div>
                     </div>
                 </div>
@@ -123,7 +123,7 @@
                 <div class="card text-center">
                     <div class="card-body">
                         <div class="fs-4 fw-bold text-warning" 
-                             th:text="${#lists.size(requests.stream().filter(r -> r.status.name() == 'PENDING').toList())}">0</div>
+                             th:text="${#lists.size(requests.?[status.name() == 'PENDING'])}">0</div>
                         <div class="text-muted">Pending</div>
                     </div>
                 </div>
@@ -132,7 +132,7 @@
                 <div class="card text-center">
                     <div class="card-body">
                         <div class="fs-4 fw-bold text-success" 
-                             th:text="${#lists.size(requests.stream().filter(r -> r.status.name() == 'APPROVED').toList())}">0</div>
+                             th:text="${#lists.size(requests.?[status.name() == 'APPROVED'])}">0</div>
                         <div class="text-muted">Approved</div>
                     </div>
                 </div>
@@ -141,7 +141,7 @@
                 <div class="card text-center">
                     <div class="card-body">
                         <div class="fs-4 fw-bold text-danger" 
-                             th:text="${#lists.size(requests.stream().filter(r -> r.status.name() == 'REJECTED').toList())}">0</div>
+                             th:text="${#lists.size(requests.?[status.name() == 'REJECTED'])}">0</div>
                         <div class="text-muted">Rejected</div>
                     </div>
                 </div>

@@ -14,6 +14,7 @@ import java.util.List;
 @Service
 @Transactional
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ItemService {
 
     private final ItemRepository itemRepository;

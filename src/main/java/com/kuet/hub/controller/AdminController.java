@@ -27,6 +27,7 @@ import java.util.List;
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 @Slf4j
+@SuppressWarnings("null")
 public class AdminController {
 
     private final UserService userService;

@@ -24,7 +24,6 @@ import java.util.List;
  * Some endpoints may also require PROVIDER role for request management.
  */
 @Controller
-@RequestMapping("/requests")
 @RequiredArgsConstructor
 @Slf4j
 public class RequestController {
@@ -41,7 +40,7 @@ public class RequestController {
      * @param userDetails the authenticated user
      * @return the request form view
      */
-    @GetMapping("/new/{itemId}")
+    @GetMapping("/requests/new/{itemId}")
     @PreAuthorize("hasRole('BORROWER')")
     public String showRequestForm(@PathVariable Long itemId, Model model,
                                   @AuthenticationPrincipal UserDetails userDetails) {
@@ -72,7 +71,7 @@ public class RequestController {
      * @param userDetails the authenticated borrower
      * @return redirect to the My Requests page on success, or back to form on error
      */
-    @PostMapping("/submit")
+    @PostMapping("/requests/submit")
     @PreAuthorize("hasRole('BORROWER')")
     public String submitRequest(@RequestParam Long itemId,
                                @Valid @ModelAttribute RequestDto requestDto,
@@ -117,6 +116,7 @@ public class RequestController {
     /**
      * Display all requests made by the currently authenticated borrower.
      * Borrowers can view their request history and current status.
+     * Accessible at /my-requests (root level) for convenience.
      *
      * @param model the Spring MVC model
      * @param userDetails the authenticated user
@@ -126,11 +126,16 @@ public class RequestController {
     @PreAuthorize("hasRole('BORROWER')")
     public String myRequests(Model model,
                             @AuthenticationPrincipal UserDetails userDetails) {
-        log.info("[REQUEST_CTRL] Borrower {} accessing My Requests dashboard", userDetails.getUsername());
+        log.info("[RUNTIME] Borrower {} is accessing their requests", userDetails.getUsername());
 
         try {
             User borrower = (User) userDetailsService.loadUserByUsername(userDetails.getUsername());
             List<Request> requests = requestService.getRequestsForBorrower(borrower);
+
+            // Ensure requests is never null
+            if (requests == null) {
+                requests = java.util.Collections.emptyList();
+            }
 
             model.addAttribute("requests", requests);
             model.addAttribute("requestCount", requests.size());
@@ -141,7 +146,8 @@ public class RequestController {
         } catch (Exception e) {
             log.error("[REQUEST_CTRL] Error loading My Requests", e);
             model.addAttribute("errorMessage", "Failed to load your requests");
-            return "error/generic";
+            model.addAttribute("requests", java.util.Collections.emptyList());
+            return "borrower/my-requests";
         }
     }
 
@@ -154,7 +160,7 @@ public class RequestController {
      * @param userDetails the authenticated provider
      * @return redirect to the provider's requests page
      */
-    @PostMapping("/{requestId}/approve")
+    @PostMapping("/requests/{requestId}/approve")
     @PreAuthorize("hasRole('PROVIDER')")
     public String approveRequest(@PathVariable Long requestId,
                                 RedirectAttributes redirectAttributes,
@@ -190,7 +196,7 @@ public class RequestController {
      * @param userDetails the authenticated provider
      * @return redirect to the provider's requests page
      */
-    @PostMapping("/{requestId}/reject")
+    @PostMapping("/requests/{requestId}/reject")
     @PreAuthorize("hasRole('PROVIDER')")
     public String rejectRequest(@PathVariable Long requestId,
                                RedirectAttributes redirectAttributes,
@@ -225,7 +231,7 @@ public class RequestController {
      * @param userDetails the authenticated borrower
      * @return redirect to My Requests
      */
-    @PostMapping("/{requestId}/complete")
+    @PostMapping("/requests/{requestId}/complete")
     @PreAuthorize("hasRole('BORROWER')")
     public String completeRequest(@PathVariable Long requestId,
                                  RedirectAttributes redirectAttributes,

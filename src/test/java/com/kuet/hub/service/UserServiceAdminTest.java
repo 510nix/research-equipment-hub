@@ -24,6 +24,7 @@ import static org.mockito.Mockito.*;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserService Administrative Tests")
+@SuppressWarnings("null")
 class UserServiceAdminTest {
 
     @Mock

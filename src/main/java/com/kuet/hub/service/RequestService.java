@@ -22,6 +22,7 @@ import java.util.List;
 @Transactional
 @RequiredArgsConstructor
 @Slf4j
+@SuppressWarnings("null")
 public class RequestService {
 
     private final RequestRepository requestRepository;
@@ -54,6 +55,12 @@ public class RequestService {
         if (!item.getStatus().equals(Item.ItemStatus.AVAILABLE)) {
             log.warn("[REQUEST] Item {} is not available (status: {})", itemId, item.getStatus());
             throw new IllegalArgumentException("This equipment is not currently available for request");
+        }
+
+        // Validate that borrower is not the owner
+        if (item.getOwner().getId().equals(borrower.getId())) {
+            log.warn("[REQUEST] User {} attempted to request their own equipment", borrower.getUsername());
+            throw new IllegalArgumentException("You cannot request your own equipment");
         }
 
         // Validate dates
