@@ -31,13 +31,19 @@
                     <h1 class="fw-bold mb-3" th:text="${item.title}">Item Title</h1>
 
                     <!-- Status & Metadata -->
+                    <!--
+                        FIX: item.status is a Java enum (Item.ItemStatus), NOT a String.
+                        Thymeleaf comparing an enum to 'AVAILABLE' (String) is always false.
+                        Use item.status.name() to get the String representation for comparison.
+                        Also: ItemStatus has no 'RESERVED' value — use BORROWED/UNAVAILABLE.
+                    -->
                     <div class="mb-4">
-                        <span class="badge bg-success" th:if="${item.status == 'AVAILABLE'}">✓ Available</span>
-                        <span class="badge bg-warning" th:if="${item.status == 'RESERVED'}">⏳ Reserved</span>
-                        <span class="badge bg-danger" th:if="${item.status != 'AVAILABLE' && item.status != 'RESERVED'}">✗ Unavailable</span>
-                        
+                        <span class="badge bg-success" th:if="${item.status?.name() == 'AVAILABLE'}">✓ Available</span>
+                        <span class="badge bg-warning" th:if="${item.status?.name() == 'BORROWED'}">⏳ Borrowed</span>
+                        <span class="badge bg-danger" th:if="${item.status?.name() == 'UNAVAILABLE'}">✗ Unavailable</span>
+
                         <span class="badge bg-primary ms-2" th:text="${item.category?.name} ?: 'Uncategorized'">Category</span>
-                        <span class="badge bg-secondary ms-2" th:text="${item.condition}">Condition</span>
+                        <span class="badge bg-secondary ms-2" th:text="${item.condition?.name() ?: 'UNKNOWN'}">Condition</span>
                     </div>
 
                     <!-- Description -->
@@ -71,35 +77,33 @@
                     <h5 class="mb-0">Request Equipment</h5>
                 </div>
                 <div class="card-body">
-                    <div th:if="${item.status != 'AVAILABLE'}" class="alert alert-warning" role="alert">
+                    <!--
+                        FIX 1: Was comparing enum item.status to String 'AVAILABLE' — always false.
+                        Fixed to use item.status.name() for proper String comparison.
+
+                        FIX 2: This page had an inline form posting to /requests/new with fields
+                        'duration' and 'purpose'. The actual endpoint is:
+                          POST /requests/submit  (RequestController.submitRequest)
+                        and it expects RequestDto fields: startDate, endDate, message.
+                        Wrong URL + wrong fields = request always failed silently.
+
+                        Fix: Replace inline form with a button linking to the correct
+                        request-form.html (/requests/new/{itemId}), which already has
+                        the right fields and posts to the right endpoint.
+                    -->
+                    <div th:if="${item.status?.name() != 'AVAILABLE'}" class="alert alert-warning" role="alert">
                         This item is currently not available for requests.
                     </div>
 
-                    <form th:if="${item.status == 'AVAILABLE'}" th:action="@{/requests/new}" method="post" class="d-flex flex-column gap-3">
-                        <input type="hidden" name="itemId" th:value="${item.id}">
-
-                        <div>
-                            <label class="form-label fw-bold">Requested Duration</label>
-                            <select name="duration" class="form-select" required>
-                                <option value="">-- Select duration --</option>
-                                <option value="1">1 Day</option>
-                                <option value="3">3 Days</option>
-                                <option value="7">1 Week</option>
-                                <option value="14">2 Weeks</option>
-                                <option value="30">1 Month</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="form-label fw-bold">Purpose (Optional)</label>
-                            <textarea name="purpose" class="form-control" rows="3" 
-                                    placeholder="Explain why you need this equipment..."></textarea>
-                        </div>
-
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            Request Equipment
-                        </button>
-                    </form>
+                    <div th:if="${item.status?.name() == 'AVAILABLE'}" class="d-grid gap-2">
+                        <p class="text-muted small mb-3">
+                            Click below to fill in your rental dates and a message to the provider.
+                        </p>
+                        <a th:href="@{/requests/new/{id}(id=${item.id})}"
+                           class="btn btn-primary btn-lg">
+                            ✉️ Request This Equipment
+                        </a>
+                    </div>
                 </div>
                 <div class="card-footer bg-light text-muted small">
                     <p class="mb-0">💡 Once requested, the owner will review and approve or decline within 24 hours.</p>

@@ -57,8 +57,15 @@ public class DataInitializer implements CommandLineRunner {
                 categoryRepository.save(category);
                 log.info("[STABILITY] Category created: {}", categoryName);
             }
+            
+            // Verify categories were persisted
+            long categoryCount = categoryRepository.count();
+            log.info("[STABILITY] Category initialization complete. Total categories in DB: {}", categoryCount);
+            if (categoryCount == 0) {
+                log.error("[STABILITY] WARNING: No categories persisted to database!");
+            }
         } else {
-            log.info("[STABILITY] Categories already exist. Skipping category initialization.");
+            log.info("[STABILITY] Categories already exist. Count: {}", categoryRepository.count());
         }
 
         // Initialize Admin User
@@ -76,9 +83,8 @@ public class DataInitializer implements CommandLineRunner {
             log.info("[STABILITY] Admin user initialized");
             
             // Initialize Sample Items for Admin Provider
-            if (itemRepository.findByOwner(admin).isEmpty()) {
+            if (itemRepository.findByOwnerWithCategory(admin).isEmpty()) { 
                 log.info("[STABILITY] Creating sample items for admin user...");
-                
                 Category firstCategory = categoryRepository.findAll().stream().findFirst().orElse(null);
                 if (firstCategory != null) {
                     Item sampleItem = new Item();
@@ -96,6 +102,12 @@ public class DataInitializer implements CommandLineRunner {
             }
         }
         
-        log.info("[STABILITY] DataInitializer completed successfully!");
+        // Final verification
+        log.info("[STABILITY] ========== DataInitializer Verification ==========");
+        log.info("[STABILITY] Total Roles: {}", roleRepository.count());
+        log.info("[STABILITY] Total Categories: {}", categoryRepository.count());
+        log.info("[STABILITY] Total Users: {}", userRepository.count());
+        log.info("[STABILITY] Total Items: {}", itemRepository.count());
+        log.info("[STABILITY] ========== DataInitializer completed successfully! ==========");
     }
 }

@@ -208,19 +208,33 @@
 
                 <!-- Request Actions -->
                 <div class="request-actions">
-                    <!-- Mark as Completed (only if approved) -->
-                    <form th:if="${request.status.name() == 'APPROVED'}" 
-                          th:action="@{/requests/{requestId}/complete(requestId=${request.id})}" 
-                          method="POST" style="display: inline;">
-                        <button type="submit" class="btn btn-sm btn-success">
-                            <i class="bi bi-check"></i> Mark as Returned
+                    <!--
+                        FIX: Form was missing th:name/_csrf token.
+                        Spring Security rejects all POST requests without a valid
+                        CSRF token → the button appeared to do nothing (silently blocked).
+                        Added the hidden CSRF input that Spring Security requires.
+
+                        This form triggers RequestController.completeRequest() which:
+                          1. Verifies the logged-in user owns this request
+                          2. Sets request.status → COMPLETED
+                          3. Sets item.status → AVAILABLE
+                        Result: item reappears on browse page, dashboard counts update.
+                    -->
+                    <form th:if="${request.status.name() == 'APPROVED'}"
+                          th:action="@{/requests/{requestId}/complete(requestId=${request.id})}"
+                          method="post"
+                          style="display: inline;"
+                          onsubmit="return confirm('Confirm you have returned this equipment?')">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button type="submit" class="btn btn-sm btn-success fw-bold">
+                            ✅ Mark as Returned
                         </button>
                     </form>
 
                     <!-- View Details Button -->
-                    <a th:href="@{/browse/{itemId}(itemId=${request.item.id})}" 
+                    <a th:href="@{/browse/{itemId}(itemId=${request.item.id})}"
                        class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-eye"></i> View Equipment
+                        👁️ View Equipment
                     </a>
                 </div>
             </div>

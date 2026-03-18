@@ -1,6 +1,5 @@
 package com.kuet.hub.controller;
 
-import com.kuet.hub.repository.ItemRepository;
 import com.kuet.hub.service.ItemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,29 +16,31 @@ import org.springframework.web.bind.annotation.*;
 public class BrowseController {
 
     private final ItemService itemService;
-    private final ItemRepository itemRepository;
 
     /**
-     * Display all available items for borrowers to browse
-     * [STABILITY FIX] Prevents the 404/500 redirect loop from /dashboard → /browse
+     * Display all available items for borrowers to browse.
+     * FIX: Changed @GetMapping("") to @GetMapping to avoid ambiguous mapping
+     * with Spring MVC when the trailing slash is absent.
      */
-    @GetMapping("")
+    @GetMapping
     public String browse(Model model) {
         try {
             log.info("[BROWSE] Fetching available items for borrower");
-            model.addAttribute("items", itemService.getAvailableItems());
-            model.addAttribute("itemCount", itemRepository.count());
-            log.info("[BROWSE] Successfully loaded {} items", itemRepository.count());
+            var items = itemService.getAvailableItems();
+            model.addAttribute("items", items);
+            model.addAttribute("itemCount", (long) items.size());
+            model.addAttribute("searchKeyword", "");
+            log.info("[BROWSE] Successfully loaded {} items", items.size());
             return "borrower/browse";
         } catch (Exception e) {
             log.error("[BROWSE] Error loading items", e);
-            model.addAttribute("errorMessage", "Failed to load equipment items. Please try again.");
+            model.addAttribute("errorMessage", "Failed to load equipment items.");
             return "error/generic";
         }
     }
 
     /**
-     * View details of a specific item
+     * View details of a specific item.
      */
     @GetMapping("/{itemId}")
     public String viewItem(@PathVariable Long itemId, Model model) {
@@ -60,22 +61,23 @@ public class BrowseController {
     }
 
     /**
-     * Search items by title (queryable by borrowers)
+     * Search items by title (queryable by borrowers).
      */
     @GetMapping("/search")
     public String search(@RequestParam(value = "q", defaultValue = "") String keyword, Model model) {
         try {
-            log.info("[BROWSE] Searching items with keyword: {}", keyword);
-            if (keyword == null || keyword.trim().isEmpty()) {
-                model.addAttribute("items", itemService.getAvailableItems());
-            } else {
-                model.addAttribute("items", itemService.searchByTitle(keyword));
-            }
+            log.info("[BROWSE] Searching items with keyword: '{}'", keyword);
+            var items = (keyword == null || keyword.trim().isEmpty())
+                    ? itemService.getAvailableItems()
+                    : itemService.searchByTitle(keyword);
+
+            model.addAttribute("items", items);
             model.addAttribute("searchKeyword", keyword);
+            model.addAttribute("itemCount", (long) items.size());
             return "borrower/browse";
         } catch (Exception e) {
             log.error("[BROWSE] Error searching items", e);
-            model.addAttribute("errorMessage", "Search failed. Please try again.");
+            model.addAttribute("errorMessage", "Search failed.");
             return "error/generic";
         }
     }

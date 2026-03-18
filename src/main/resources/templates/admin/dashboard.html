@@ -121,20 +121,20 @@
             </div>
             <div class="col-md-6 col-lg-3">
                 <div class="stat-card">
-                    <div class="stat-number" th:text="${items.size()}">0</div>
-                    <div class="stat-label">Total Equipment Items</div>
+                    <div class="stat-number" th:text="${activeUsers}">0</div>
+                    <div class="stat-label">Active Users</div>
                 </div>
             </div>
             <div class="col-md-6 col-lg-3">
                 <div class="stat-card">
-                    <div class="stat-number" th:text="${#lists.size(items) > 0 ? items.size() : 0}">0</div>
-                    <div class="stat-label">Inventory</div>
+                    <div class="stat-number" th:text="${availableCount}">0</div>
+                    <div class="stat-label">Available Items</div>
                 </div>
             </div>
             <div class="col-md-6 col-lg-3">
                 <div class="stat-card">
-                    <div class="stat-number">✓</div>
-                    <div class="stat-label">System Status: Active</div>
+                    <div class="stat-number" style="color:#856404;" th:text="${borrowedCount}">0</div>
+                    <div class="stat-label">Currently Borrowed</div>
                 </div>
             </div>
         </div>
@@ -168,7 +168,7 @@
                     <tr th:each="user : ${users}">
                         <td th:text="${user.id}">1</td>
                         <td th:text="${user.username}">john_doe</td>
-                        <td th:text="${user.email}">john@example.com</td>
+                        <td th:text="${user.email}"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="771d181f1937120f161a071b125914181a">[email&#160;protected]</a></td>
                         <td>
                             <span th:each="role : ${user.roles}" 
                                   class="role-badge"
@@ -182,12 +182,21 @@
                             <span th:unless="${user.enabled}" class="badge bg-danger">Disabled</span>
                         </td>
                         <td>
+                            <!--
+                                Dependency Lock UI:
+                                If a borrower has APPROVED requests or a provider has BORROWED items,
+                                the backend (UserService) will reject the deactivation with an
+                                IllegalStateException. The button still shows, but the error
+                                flash message explains exactly why it was blocked.
+                                We grey-out the button for borrowed users as a visual hint.
+                            -->
                             <form th:action="@{/admin/users/{id}/toggle-status(id=${user.id})}" method="post" style="display:inline;">
-                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
-                                <button type="submit" 
+                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                <button type="submit"
                                         th:classappend="${user.enabled ? 'btn-danger' : 'btn-success'}"
                                         class="btn btn-sm"
-                                        th:text="${user.enabled ? 'Deactivate' : 'Activate'}">
+                                        th:text="${user.enabled ? 'Deactivate' : 'Activate'}"
+                                        th:title="${user.enabled ? 'Deactivation blocked if user has active borrows' : 'Re-activate this user'}">
                                     Deactivate
                                 </button>
                             </form>
@@ -216,22 +225,39 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="item : ${items}">
+                    <tr th:each="item : ${items}"
+                        th:classappend="${!item.owner.enabled} ? 'table-secondary' : ''">
                         <td th:text="${item.id}">1</td>
-                        <td th:text="${item.title}">Microscope</td>
-                        <td th:text="${item.owner.username}">provider_user</td>
+                        <td>
+                            <span th:text="${item.title}">Microscope</span>
+                            <!--
+                                Items from deactivated providers stay in the DB and are
+                                shown here for admin oversight, but are hidden from the
+                                borrower's Browse page (ItemRepository.findByStatusWithCategory
+                                filters by owner.enabled = true).
+                            -->
+                            <span th:unless="${item.owner.enabled}"
+                                  class="badge bg-secondary ms-1"
+                                  title="This item is hidden from borrowers while provider is deactivated">
+                                🔒 Hidden
+                            </span>
+                        </td>
+                        <td>
+                            <span th:text="${item.owner.username}">provider_user</span>
+                            <span th:unless="${item.owner.enabled}" class="badge bg-danger ms-1">Inactive</span>
+                        </td>
                         <td th:text="${item.category != null ? item.category.name : 'N/A'}">Electronics</td>
                         <td>
                             <span class="badge"
-                                  th:classappend="${item.condition.name() == 'NEW' ? 'bg-success' : 
-                                                    item.condition.name() == 'USED' ? 'bg-warning' : 
+                                  th:classappend="${item.condition.name() == 'NEW' ? 'bg-success' :
+                                                    item.condition.name() == 'USED' ? 'bg-warning' :
                                                     'bg-danger'}"
                                   th:text="${item.condition.name()}">NEW</span>
                         </td>
                         <td>
                             <span class="status-badge"
-                                  th:classappend="${item.status.name() == 'AVAILABLE' ? 'status-available' : 
-                                                    item.status.name() == 'BORROWED' ? 'status-borrowed' : 
+                                  th:classappend="${item.status.name() == 'AVAILABLE' ? 'status-available' :
+                                                    item.status.name() == 'BORROWED' ? 'status-borrowed' :
                                                     'status-unavailable'}"
                                   th:text="${item.status.name()}">AVAILABLE</span>
                         </td>
@@ -276,9 +302,4 @@
 
     <!-- Footer -->
     <footer class="bg-light text-center py-3 mt-5">
-        <p class="text-muted mb-0">Research Equipment Hub &copy; 2025 - Admin Dashboard</p>
-    </footer>
-
-    <script th:src="@{/lib/bootstrap.bundle.min.js}"></script>
-</body>
-</html>
+        <p class="text-muted mb-0">Research Equipment Hub &copy; 2025 - A

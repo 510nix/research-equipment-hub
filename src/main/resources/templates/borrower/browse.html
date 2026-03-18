@@ -53,17 +53,18 @@
                     <h5 class="card-title fw-bold" th:text="${item.title}">Item Title</h5>
                     
                     <div class="mb-3">
-                        <span class="badge bg-primary" th:text="${item.category?.name} ?: 'Uncategorized'">Category</span>
-                        <span class="badge bg-secondary ms-2" th:text="${item.condition}">Condition</span>
+                        <span class="badge bg-primary" th:text="${item.category?.name ?: 'Uncategorized'}">Category</span>
+                        <span class="badge bg-secondary ms-2" th:text="${item.condition?.name() ?: 'UNKNOWN'}">Condition</span>
                     </div>
 
-                    <p class="card-text text-muted" th:text="${#strings.abbreviate(item.description, 100)}">
+                    <p class="card-text text-muted"
+                       th:text="${#strings.abbreviate(item.description != null ? item.description : '', 100)}">
                         Item description
                     </p>
 
                     <div class="mb-3">
                         <small class="text-muted">
-                            <strong>Owner:</strong> <span th:text="${item.owner?.username}">Unknown</span>
+                            <strong>Owner:</strong> <span th:text="${item.owner?.username ?: 'Unknown'}">Unknown</span>
                         </small>
                     </div>
 

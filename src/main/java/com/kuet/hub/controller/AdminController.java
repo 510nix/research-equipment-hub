@@ -18,10 +18,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.List;
 
-/**
- * Admin Controller to manage administrative dashboard and system-wide operations.
- * All endpoints in this controller require ROLE_ADMIN authority.
- */
 @Controller
 @RequestMapping("/admin")
 @PreAuthorize("hasRole('ADMIN')")
@@ -34,227 +30,198 @@ public class AdminController {
     private final ItemRepository itemRepository;
     private final CategoryRepository categoryRepository;
 
-    /**
-     * Admin Dashboard - Displays all users and items in the system.
-     * Provides an overview of system state for administrative purposes.
-     *
-     * @param model the Spring MVC model to populate
-     * @return the admin dashboard view name
-     */
     @GetMapping("/dashboard")
     public String adminDashboard(Model model) {
-        log.info("[ADMIN] Admin accessing dashboard");
-        
+        log.info("[ADMIN] Loading admin dashboard");
         try {
-            // Fetch all users in the system
             List<User> allUsers = userService.findAllUsers();
-            log.info("[ADMIN] Loaded {} users for admin dashboard", allUsers.size());
-            
-            // Fetch all items in the system
-            List<Item> allItems = itemRepository.findAll();
-            log.info("[ADMIN] Loaded {} items for admin dashboard", allItems.size());
-            
-            // Add to model for view rendering
+            // Eager-fetch owner + category to prevent LazyInitializationException
+            // Shows ALL items including from deactivated providers (admin needs full visibility)
+            List<Item> allItems = itemRepository.findAllWithOwnerAndCategory();
+
+            long availableCount = allItems.stream()
+                    .filter(i -> i.getStatus() == Item.ItemStatus.AVAILABLE
+                              && i.getOwner().isEnabled()).count();
+            long borrowedCount = allItems.stream()
+                    .filter(i -> i.getStatus() == Item.ItemStatus.BORROWED).count();
+            long activeUsers = allUsers.stream()
+                    .filter(User::isEnabled).count();
+
             model.addAttribute("users", allUsers);
             model.addAttribute("items", allItems);
-            
-            log.info("[ADMIN] Admin dashboard initialized successfully");
+            model.addAttribute("availableCount", availableCount);
+            model.addAttribute("borrowedCount", borrowedCount);
+            model.addAttribute("activeUsers", activeUsers);
+
+            log.info("[ADMIN] Dashboard: {} users ({} active), {} items ({} available, {} borrowed)",
+                    allUsers.size(), activeUsers, allItems.size(), availableCount, borrowedCount);
             return "admin/dashboard";
-            
+
         } catch (Exception e) {
-            log.error("[ADMIN] Error loading admin dashboard", e);
-            model.addAttribute("error", "Failed to load dashboard data");
+            log.error("[ADMIN] Error loading dashboard", e);
+            model.addAttribute("errorMessage", "Failed to load dashboard data");
             return "error/generic";
         }
     }
 
     /**
      * Toggle user enabled/disabled status.
-     * Admin can enable or disable user accounts to maintain platform security.
      *
-     * @param userId the ID of the user to toggle
-     * @param redirectAttributes for flash messages
-     * @return redirect to admin dashboard
+     * UserService.toggleUserEnabled() enforces the Dependency Lock:
+     * it throws IllegalStateException if an active borrow blocks deactivation.
+     * We catch that specifically and surface a clear message to the admin.
      */
     @PostMapping("/users/{id}/toggle-status")
-    public String toggleUserStatus(@PathVariable("id") Long userId, RedirectAttributes redirectAttributes) {
-        log.info("[ADMIN] Attempting to toggle status for user ID: {}", userId);
-        
+    public String toggleUserStatus(@PathVariable("id") Long userId,
+                                   RedirectAttributes redirectAttributes) {
+        log.info("[ADMIN] Toggle status for user ID: {}", userId);
         try {
             User user = userService.findById(userId);
+            boolean wasEnabled = user.isEnabled();
             userService.toggleUserEnabled(userId);
-            
-            String status = user.isEnabled() ? "deactivated" : "activated";
-            log.info("[ADMIN] User ID {} has been {}", userId, status);
-            
-            redirectAttributes.addFlashAttribute("successMessage", 
-                "User '" + user.getUsername() + "' has been " + status + " successfully");
-            
+
+            String action = wasEnabled ? "deactivated" : "activated";
+            String detail = wasEnabled ? " (pending requests cancelled, items hidden from browse)" : "";
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "User '" + user.getUsername() + "' has been " + action + " successfully." + detail);
+
+        } catch (IllegalStateException e) {
+            // Dependency Lock violation — active borrow prevents deactivation
+            log.warn("[ADMIN] Deactivation blocked: {}", e.getMessage());
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+
         } catch (IllegalArgumentException e) {
-            log.warn("[ADMIN] User not found for toggle: {}", userId);
-            redirectAttributes.addFlashAttribute("errorMessage", "User not found");
+            redirectAttributes.addFlashAttribute("errorMessage", "User not found.");
         } catch (Exception e) {
             log.error("[ADMIN] Error toggling user status", e);
-            redirectAttributes.addFlashAttribute("errorMessage", "Failed to toggle user status");
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Failed to toggle user status: " + e.getMessage());
         }
-        
         return "redirect:/admin/dashboard";
     }
 
-    /**
-     * List all categories in the system.
-     *
-     * @param model the Spring MVC model to populate
-     * @return the categories list view name
-     */
     @GetMapping("/categories")
     public String listCategories(Model model) {
-        log.info("[ADMIN] Listing all categories");
-        
         try {
-            List<Category> categories = categoryRepository.findAll();
-            log.info("[ADMIN] Retrieved {} categories", categories.size());
-            
-            model.addAttribute("categories", categories);
+            model.addAttribute("categories", categoryRepository.findAll());
             model.addAttribute("categoryDto", new CategoryDto());
-            
             return "admin/categories";
-            
         } catch (Exception e) {
             log.error("[ADMIN] Error listing categories", e);
-            model.addAttribute("error", "Failed to load categories");
+            model.addAttribute("errorMessage", "Failed to load categories");
             return "error/generic";
         }
     }
 
-    /**
-     * Create a new category.
-     *
-     * @param categoryDto the category data transfer object
-     * @param bindingResult binding result for validation errors
-     * @param redirectAttributes for flash messages
-     * @return redirect to categories list
-     */
     @PostMapping("/categories/new")
-    public String createCategory(@Valid @ModelAttribute CategoryDto categoryDto, 
-                                BindingResult bindingResult, 
-                                RedirectAttributes redirectAttributes) {
-        log.info("[ADMIN] Attempting to create category: {}", categoryDto.getName());
-        
+    public String createCategory(@Valid @ModelAttribute CategoryDto categoryDto,
+                                 BindingResult bindingResult,
+                                 RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            log.warn("[ADMIN] Category validation failed: {}", bindingResult.getFieldError());
             redirectAttributes.addFlashAttribute("validationErrors", bindingResult.getAllErrors());
             return "redirect:/admin/categories";
         }
-        
         try {
             if (categoryRepository.existsByName(categoryDto.getName())) {
-                log.warn("[ADMIN] Category already exists: {}", categoryDto.getName());
-                redirectAttributes.addFlashAttribute("errorMessage", 
-                    "Category '" + categoryDto.getName() + "' already exists");
+                redirectAttributes.addFlashAttribute("errorMessage",
+                        "Category '" + categoryDto.getName() + "' already exists.");
                 return "redirect:/admin/categories";
             }
-            
             Category category = new Category();
             category.setName(categoryDto.getName());
             category.setDescription(categoryDto.getDescription());
             categoryRepository.save(category);
-            
-            log.info("[ADMIN] Category created successfully: {}", categoryDto.getName());
-            redirectAttributes.addFlashAttribute("successMessage", 
-                "Category '" + categoryDto.getName() + "' created successfully");
-            
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "Category '" + categoryDto.getName() + "' created successfully.");
         } catch (Exception e) {
             log.error("[ADMIN] Error creating category", e);
-            redirectAttributes.addFlashAttribute("errorMessage", "Failed to create category");
+            redirectAttributes.addFlashAttribute("errorMessage", "Failed to create category.");
         }
-        
         return "redirect:/admin/categories";
     }
 
-    /**
-     * Update an existing category.
-     *
-     * @param id the category ID
-     * @param categoryDto the updated category data
-     * @param bindingResult binding result for validation errors
-     * @param redirectAttributes for flash messages
-     * @return redirect to categories list
-     */
     @PostMapping("/categories/{id}/edit")
-    public String editCategory(@PathVariable Long id, 
-                              @Valid @ModelAttribute CategoryDto categoryDto,
-                              BindingResult bindingResult,
-                              RedirectAttributes redirectAttributes) {
-        log.info("[ADMIN] Attempting to edit category ID: {}", id);
-        
+    public String editCategory(@PathVariable Long id,
+                               @Valid @ModelAttribute CategoryDto categoryDto,
+                               BindingResult bindingResult,
+                               RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
-            log.warn("[ADMIN] Category validation failed during edit");
             redirectAttributes.addFlashAttribute("validationErrors", bindingResult.getAllErrors());
             return "redirect:/admin/categories";
         }
-        
         try {
             Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found: " + id));
-            
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found: " + id));
             category.setName(categoryDto.getName());
             category.setDescription(categoryDto.getDescription());
             categoryRepository.save(category);
-            
-            log.info("[ADMIN] Category updated successfully: {}", id);
-            redirectAttributes.addFlashAttribute("successMessage", 
-                "Category updated successfully");
-            
+            redirectAttributes.addFlashAttribute("successMessage", "Category updated successfully.");
         } catch (IllegalArgumentException e) {
-            log.warn("[ADMIN] Category not found for edit: {}", id);
-            redirectAttributes.addFlashAttribute("errorMessage", "Category not found");
+            redirectAttributes.addFlashAttribute("errorMessage", "Category not found.");
         } catch (Exception e) {
             log.error("[ADMIN] Error editing category", e);
-            redirectAttributes.addFlashAttribute("errorMessage", "Failed to update category");
+            redirectAttributes.addFlashAttribute("errorMessage", "Failed to update category.");
         }
-        
         return "redirect:/admin/categories";
     }
 
     /**
-     * Delete a category if no items are linked to it.
+     * Delete a category — enforces two-level Dependency Lock:
      *
-     * @param id the category ID
-     * @param redirectAttributes for flash messages
-     * @return redirect to categories list
+     * Level 1 (existing): category cannot be deleted if ANY items belong to it.
+     *
+     * Level 2 (NEW): category cannot be deleted if ANY of its items are currently
+     * BORROWED — even if we were willing to delete non-borrowed items, an active
+     * borrow means a borrower's request and provider's dashboard still reference
+     * this category. Deleting it would cause NullPointerException when rendering
+     * category names in those views.
+     *
+     * The check order:
+     *   1. Are there any BORROWED items in this category? → hard block, clearest message
+     *   2. Are there any items at all in this category?   → standard block
+     *   3. Safe to delete.
      */
     @PostMapping("/categories/{id}/delete")
     public String deleteCategory(@PathVariable Long id, RedirectAttributes redirectAttributes) {
-        log.info("[ADMIN] Attempting to delete category ID: {}", id);
-        
         try {
             Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found: " + id));
-            
-            // Check if any items are linked to this category
-            long itemCount = itemRepository.countByCategory(category);
-            
-            if (itemCount > 0) {
-                log.warn("[ADMIN] Cannot delete category with {} linked items", itemCount);
-                redirectAttributes.addFlashAttribute("errorMessage", 
-                    "Cannot delete category: " + itemCount + " item(s) are linked to this category");
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found: " + id));
+
+            // Level 2 check: any item BORROWED right now?
+            long borrowedCount = itemRepository.countBorrowedByCategory(category);
+            if (borrowedCount > 0) {
+                log.warn("[ADMIN] Cannot delete category '{}' — {} item(s) currently BORROWED",
+                        category.getName(), borrowedCount);
+                redirectAttributes.addFlashAttribute("errorMessage",
+                        "Cannot delete category '" + category.getName() + "': "
+                        + borrowedCount + " item(s) in this category are currently borrowed. "
+                        + "All equipment must be returned before this category can be deleted.");
                 return "redirect:/admin/categories";
             }
-            
+
+            // Level 1 check: any items at all in this category?
+            long totalItems = itemRepository.countByCategory(category);
+            if (totalItems > 0) {
+                log.warn("[ADMIN] Cannot delete category '{}' — {} item(s) linked",
+                        category.getName(), totalItems);
+                redirectAttributes.addFlashAttribute("errorMessage",
+                        "Cannot delete category '" + category.getName() + "': "
+                        + totalItems + " item(s) are linked to it. "
+                        + "Remove or re-categorise all items first.");
+                return "redirect:/admin/categories";
+            }
+
             categoryRepository.deleteById(id);
-            log.info("[ADMIN] Category deleted successfully: {}", id);
-            redirectAttributes.addFlashAttribute("successMessage", 
-                "Category deleted successfully");
-            
+            log.info("[ADMIN] Category '{}' deleted", category.getName());
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "Category '" + category.getName() + "' deleted successfully.");
+
         } catch (IllegalArgumentException e) {
-            log.warn("[ADMIN] Category not found for deletion: {}", id);
-            redirectAttributes.addFlashAttribute("errorMessage", "Category not found");
+            redirectAttributes.addFlashAttribute("errorMessage", "Category not found.");
         } catch (Exception e) {
             log.error("[ADMIN] Error deleting category", e);
-            redirectAttributes.addFlashAttribute("errorMessage", "Failed to delete category");
+            redirectAttributes.addFlashAttribute("errorMessage", "Failed to delete category.");
         }
-        
         return "redirect:/admin/categories";
     }
 }

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${itemDto != null and itemDto.id != null ? 'Edit Item' : 'Add New Item'} + ' – Research Hub'">Add New Item – Research Hub</title>
+    <link rel="stylesheet" th:href="@{/lib/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <style>
+        .form-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .form-title {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 0.75rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .form-control {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            font-size: 1rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .form-select {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 0.75rem;
+            font-size: 1rem;
+            background-color: white;
+            cursor: pointer;
+        }
+        .form-select:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        textarea.form-control {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .form-text {
+            display: block;
+            margin-top: 0.25rem;
+            font-size: 0.875rem;
+            color: #666;
+        }
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 2rem;
+        }
+        .btn-group button,
+        .btn-group a {
+            flex: 1;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background-color: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background-color: #e9ecef;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background-color: #dee2e6;
+        }
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 0.375rem;
+            border-left: 4px solid;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .error-message {
+            color: #dc3545;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            display: block;
+        }
+        .field-error {
+            border-color: #dc3545 !important;
+        }
+        .empty-categories-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav th:replace="~{fragments/navbar :: navbar}"></nav>
+
+    <div class="container">
+        <div class="form-container">
+            <!-- Form Title -->
+            <h1 class="form-title">
+                <span th:if="${itemDto == null or itemDto.id == null}">➕ Add New Item</span>
+                <span th:if="${itemDto != null and itemDto.id != null}">✏️ Edit Item</span>
+            </h1>
+
+            <!-- Error Messages -->
+            <div th:if="${errorMessage}" class="alert alert-danger">
+                <strong>Error:</strong> <span th:text="${errorMessage}"></span>
+            </div>
+
+            <!-- Success Message (for flash attributes on redirect) -->
+            <div th:if="${successMessage}" class="alert alert-success">
+                <strong>Success!</strong> <span th:text="${successMessage}"></span>
+            </div>
+
+            <!-- No Categories Warning -->
+            <div th:if="${categories == null or #lists.isEmpty(categories)}" class="empty-categories-warning">
+                ⚠️ <strong>No Categories Available</strong><br/>
+                Please contact the administrator to create categories before adding items.
+            </div>
+
+            <!-- Item Form -->
+            <form th:action="${itemDto != null and itemDto.id != null} ? @{/provider/items/{id}/edit(id=${itemDto.id})} : @{/provider/items/new}"
+                  th:object="${itemDto}"
+                  method="post"
+                  th:if="${categories != null and not #lists.isEmpty(categories)}">
+                
+                <!-- CSRF Token -->
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+                <!-- Title Field -->
+                <div class="form-group">
+                    <label for="title" class="form-label">Item Title <span class="text-danger">*</span></label>
+                    <input type="text"
+                           id="title"
+                           th:field="*{title}"
+                           class="form-control"
+                           th:classappend="${#fields.hasErrors('title') ? 'field-error' : ''}"
+                           placeholder="e.g., Digital Oscilloscope, Microscope, etc."
+                           required>
+                    <span th:if="${#fields.hasErrors('title')}" class="error-message" th:errors="*{title}"></span>
+                </div>
+
+                <!-- Description Field -->
+                <div class="form-group">
+                    <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
+                    <textarea id="description"
+                              th:field="*{description}"
+                              class="form-control"
+                              th:classappend="${#fields.hasErrors('description') ? 'field-error' : ''}"
+                              placeholder="Provide details about the equipment: specifications, condition, usage instructions, etc."
+                              required></textarea>
+                    <span class="form-text">Help other researchers understand what they're borrowing</span>
+                    <span th:if="${#fields.hasErrors('description')}" class="error-message" th:errors="*{description}"></span>
+                </div>
+
+                <!-- Category Dropdown -->
+                <div class="form-group">
+                    <label for="categoryId" class="form-label">Category <span class="text-danger">*</span></label>
+                    <select id="categoryId"
+                            th:field="*{categoryId}"
+                            class="form-select"
+                            th:classappend="${#fields.hasErrors('categoryId') ? 'field-error' : ''}"
+                            required>
+                        <option value="" disabled selected>-- Select a Category --</option>
+                        <option th:each="cat : ${categories}"
+                                th:if="${cat != null and cat.id != null}"
+                                th:value="${cat.id}"
+                                th:text="${cat.name != null ? cat.name : 'Unnamed Category'}">
+                            Category
+                        </option>
+                    </select>
+                    <span class="form-text">Choose the equipment type from the list</span>
+                    <span th:if="${#fields.hasErrors('categoryId')}" class="error-message" th:errors="*{categoryId}"></span>
+                </div>
+
+                <!-- Condition Dropdown -->
+                <div class="form-group">
+                    <label for="condition" class="form-label">Condition <span class="text-danger">*</span></label>
+                    <select id="condition"
+                            th:field="*{condition}"
+                            class="form-select"
+                            th:classappend="${#fields.hasErrors('condition') ? 'field-error' : ''}"
+                            required>
+                        <option value="" disabled selected>-- Select Condition --</option>
+                        <option th:each="cond : ${conditions}"
+                                th:value="${cond}"
+                                th:text="${cond}">
+                            Condition
+                        </option>
+                    </select>
+                    <span class="form-text">Describe the current state of the equipment</span>
+                    <span th:if="${#fields.hasErrors('condition')}" class="error-message" th:errors="*{condition}"></span>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="btn-group">
+                    <button type="submit" class="btn-primary">
+                        <span th:if="${itemDto == null or itemDto.id == null}">➕ List Item</span>
+                        <span th:if="${itemDto != null and itemDto.id != null}">💾 Update Item</span>
+                    </button>
+                    <a href="/provider/dashboard" class="btn-secondary">❌ Cancel</a>
+                </div>
+            </form>
+
+            <!-- Fallback Message if No Categories -->
+            <div th:if="${categories == null or #lists.isEmpty(categories)}" class="mt-4">
+                <p class="text-muted">Unable to load the item form because no categories are available in the system.</p>
+                <div class="btn-group">
+                    <a href="/provider/dashboard" class="btn-secondary">← Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script th:src="@{/lib/bootstrap.bundle.min.js}"></script>
+    <script th:src="@{/js/app.js}"></script>
+</body>
+</html>
