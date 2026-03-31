@@ -1,0 +1,78 @@
+name: Java CI/CD with Maven and Docker
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: research_hub
+          POSTGRES_USER: user_name
+          POSTGRES_PASSWORD: password123
+        ports: [ 5432:5432 ]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Grant execute permission for mvnw
+        run: chmod +x mvnw
+
+      # ── Step 1: Run tests against H2 (in-memory, no PostgreSQL needed) ──────
+      #
+      # FIX: Tests must run WITHOUT the PostgreSQL environment variables.
+      # Root cause of CI failures:
+      #   Spring Boot's property resolution order puts env vars ABOVE profile YAML.
+      #   Setting SPRING_DATASOURCE_URL=jdbc:postgresql://... in the env block
+      #   overrides application-test.yaml's H2 url — even with @ActiveProfiles("test").
+      #   Hibernate then loads PostgreSQLDialect and sends the DDL command
+      #   "set client_min_messages = WARNING" to H2, which rejects it with a
+      #   SQL syntax error → ApplicationContext fails to start → all 23 integration
+      #   tests die with "ApplicationContext failure threshold (1) exceeded".
+      #
+      # Solution: run tests in a clean step with NO datasource env vars.
+      # The -D flags enforce H2 at the Maven/JVM level (highest priority),
+      # overriding anything that might leak from the runner environment.
+      - name: Run Tests (H2 in-memory, isolated from PostgreSQL)
+        run: |
+          ./mvnw test \
+            -Dspring.profiles.active=test \
+            -Dspring.datasource.url="jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE" \
+            -Dspring.datasource.driver-class-name=org.h2.Driver \
+            -Dspring.datasource.username=sa \
+            -Dspring.datasource.password= \
+            -Dspring.jpa.database-platform=org.hibernate.dialect.H2Dialect \
+            -Dspring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect \
+            -Dspring.jpa.hibernate.ddl-auto=create-drop
+
+      # ── Step 2: Build the production JAR against real PostgreSQL ─────────────
+      #
+      # Tests are already done above (skipped here with -DskipTests).
+      # PostgreSQL env vars are only set for this step so they never
+      # contaminate the test JVM in Step 1.
+      - name: Build Production JAR (skips tests, uses PostgreSQL config)
+        run: ./mvnw package -DskipTests
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/research_hub
+          SPRING_DATASOURCE_USERNAME: user_name
+          SPRING_DATASOURCE_PASSWORD: password123
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
