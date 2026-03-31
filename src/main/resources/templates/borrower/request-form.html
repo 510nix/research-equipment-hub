@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Equipment – Research Hub</title>
+    <link rel="stylesheet" th:href="@{/lib/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/css/main.css}">
+    <style>
+        .form-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .form-section {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        .form-header {
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .required-field::after {
+            content: " *";
+            color: #dc3545;
+        }
+        .form-text-hint {
+            font-size: 0.85rem;
+            color: #666;
+            display: block;
+            margin-top: 0.25rem;
+        }
+        .error-message {
+            color: #dc3545;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav th:replace="~{fragments/navbar :: navbar}"></nav>
+
+    <div class="container py-5">
+        <div class="form-container">
+            <!-- Header -->
+            <div class="mb-4">
+                <h1 class="fw-bold">📝 Request Equipment</h1>
+                <p class="text-muted">Fill in your details to request this equipment from the provider</p>
+            </div>
+
+            <!-- Info Box -->
+            <div class="info-box">
+                <strong>ℹ️ Important:</strong> The provider will review your request within 24 hours. 
+                You will be notified about the approval status.
+            </div>
+
+            <!-- Error Messages -->
+            <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-circle"></i> <span th:text="${errorMessage}"></span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+
+            <!-- Request Form -->
+            <form th:action="@{/requests/submit}" method="POST" class="form-section">
+                <!-- Hidden Item ID -->
+                <input type="hidden" name="itemId" th:value="${itemId}">
+
+                <!-- Dates Section -->
+                <div class="form-header">
+                    <h5 class="section-title">📅 Rental Period</h5>
+                </div>
+
+                <!-- Start Date -->
+                <div class="mb-3">
+                    <label for="startDate" class="form-label">
+                        <span class="required-field">Start Date</span>
+                    </label>
+                    <input type="date" class="form-control" id="startDate" name="startDate" 
+                           required th:min="${today}">
+                    <span class="form-text-hint">The date you plan to start using this equipment</span>
+                </div>
+
+                <!-- End Date -->
+                <div class="mb-3">
+                    <label for="endDate" class="form-label">
+                        <span class="required-field">End Date</span>
+                    </label>
+                    <input type="date" class="form-control" id="endDate" name="endDate" 
+                           required th:min="${today}">
+                    <span class="form-text-hint">The date you plan to return the equipment (must be after start date)</span>
+                </div>
+
+                <!-- Message Section -->
+                <div class="form-header mt-4">
+                    <h5 class="section-title">💬 Message to Provider</h5>
+                </div>
+
+                <!-- Message Textarea -->
+                <div class="mb-3">
+                    <label for="message" class="form-label">
+                        <span class="required-field">Message</span>
+                    </label>
+                    <textarea class="form-control" id="message" name="message" rows="4" 
+                              placeholder="Please tell the provider about your research project and why you need this equipment..."
+                              required></textarea>
+                    <span class="form-text-hint">Max 500 characters. This helps the provider understand your needs.</span>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="d-flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="bi bi-check-circle"></i> Submit Request
+                    </button>
+                    <a href="/browse" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </a>
+                </div>
+            </form>
+
+            <!-- Back to Browse -->
+            <div class="text-center mt-4">
+                <a href="/browse" class="text-decoration-none">
+                    ← Back to Equipment List
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-light text-center py-3 mt-5">
+        <p class="text-muted mb-0">Research Equipment Hub &copy; 2025</p>
+    </footer>
+
+    <script th:src="@{/lib/bootstrap.bundle.min.js}"></script>
+    <script>
+        // Validate that end date is not before start date
+        document.getElementById('startDate').addEventListener('change', function() {
+            const endDate = document.getElementById('endDate');
+            if (endDate.value && new Date(this.value) > new Date(endDate.value)) {
+                endDate.value = this.value;
+            }
+            endDate.min = this.value;
+        });
+    </script>
+</body>
+</html>

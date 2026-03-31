@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class FindByUsername_NotFound_Test {
 
     @Mock private UserRepository userRepository;

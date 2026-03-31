@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${item?.title} + ' – Research Hub'">Item Details – Research Hub</title>
+    <!-- [STABILITY FIX] Local Bootstrap CSS for tracking prevention bypass -->
+    <link rel="stylesheet" href="/lib/bootstrap.min.css" th:href="@{/lib/bootstrap.min.css}">
+    <link rel="stylesheet" href="/css/main.css" th:href="@{/css/main.css}">
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+<div class="container py-5">
+    <!-- Back Button -->
+    <div class="mb-3">
+        <a th:href="@{/browse}" class="btn btn-outline-secondary">← Back to Browse</a>
+    </div>
+
+    <!-- Error Message -->
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Item Details -->
+    <div class="row" th:if="${item}">
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <h1 class="fw-bold mb-3" th:text="${item.title}">Item Title</h1>
+
+                    <!-- Status & Metadata -->
+                    <!--
+                        FIX: item.status is a Java enum (Item.ItemStatus), NOT a String.
+                        Thymeleaf comparing an enum to 'AVAILABLE' (String) is always false.
+                        Use item.status.name() to get the String representation for comparison.
+                        Also: ItemStatus has no 'RESERVED' value — use BORROWED/UNAVAILABLE.
+                    -->
+                    <div class="mb-4">
+                        <span class="badge bg-success" th:if="${item.status?.name() == 'AVAILABLE'}">✓ Available</span>
+                        <span class="badge bg-warning" th:if="${item.status?.name() == 'BORROWED'}">⏳ Borrowed</span>
+                        <span class="badge bg-danger" th:if="${item.status?.name() == 'UNAVAILABLE'}">✗ Unavailable</span>
+
+                        <span class="badge bg-primary ms-2" th:text="${item.category?.name} ?: 'Uncategorized'">Category</span>
+                        <span class="badge bg-secondary ms-2" th:text="${item.condition?.name() ?: 'UNKNOWN'}">Condition</span>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="mb-4">
+                        <h5 class="fw-bold">Description</h5>
+                        <p class="text-muted" th:text="${item.description} ?: 'No description provided.'">
+                            Item description
+                        </p>
+                    </div>
+
+                    <!-- Owner Info -->
+                    <div class="card bg-light border-0">
+                        <div class="card-body">
+                            <h6 class="fw-bold">Equipment Owner</h6>
+                            <p class="mb-0">
+                                <strong>👤 Username:</strong> <span th:text="${item.owner?.username}">Unknown</span>
+                            </p>
+                            <p class="mb-0">
+                                <strong>📧 Email:</strong> <span th:text="${item.owner?.email}">Not provided</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Request Section -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm sticky-top" style="top: 20px;">
+                <div class="card-header bg-primary text-white py-3">
+                    <h5 class="mb-0">Request Equipment</h5>
+                </div>
+                <div class="card-body">
+                    <!--
+                        FIX 1: Was comparing enum item.status to String 'AVAILABLE' — always false.
+                        Fixed to use item.status.name() for proper String comparison.
+
+                        FIX 2: This page had an inline form posting to /requests/new with fields
+                        'duration' and 'purpose'. The actual endpoint is:
+                          POST /requests/submit  (RequestController.submitRequest)
+                        and it expects RequestDto fields: startDate, endDate, message.
+                        Wrong URL + wrong fields = request always failed silently.
+
+                        Fix: Replace inline form with a button linking to the correct
+                        request-form.html (/requests/new/{itemId}), which already has
+                        the right fields and posts to the right endpoint.
+                    -->
+                    <div th:if="${item.status?.name() != 'AVAILABLE'}" class="alert alert-warning" role="alert">
+                        This item is currently not available for requests.
+                    </div>
+
+                    <div th:if="${item.status?.name() == 'AVAILABLE'}" class="d-grid gap-2">
+                        <p class="text-muted small mb-3">
+                            Click below to fill in your rental dates and a message to the provider.
+                        </p>
+                        <a th:href="@{/requests/new/{id}(id=${item.id})}"
+                           class="btn btn-primary btn-lg">
+                            ✉️ Request This Equipment
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-muted small">
+                    <p class="mb-0">💡 Once requested, the owner will review and approve or decline within 24 hours.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Not Found -->
+    <div th:unless="${item}" class="alert alert-warning text-center py-5">
+        <h4>Item Not Found</h4>
+        <p class="text-muted mb-3">The equipment you're looking for doesn't exist or has been removed.</p>
+        <a th:href="@{/browse}" class="btn btn-primary">Browse Other Equipment</a>
+    </div>
+</div>
+
+<!-- [STABILITY FIX] Local Bootstrap JS and app.js -->
+<script src="/lib/bootstrap.bundle.min.js" th:src="@{/lib/bootstrap.bundle.min.js}"></script>
+<script src="/js/app.js" th:src="@{/js/app.js}"></script>
+</body>
+</html>

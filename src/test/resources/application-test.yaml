@@ -1,13 +1,46 @@
 spring:
+  # ── Datasource ────────────────────────────────────────────────────────────
+  # FIX: These must be set here AND enforced via surefire system properties
+  # in ci.yml. Spring Boot env-var priority (SPRING_DATASOURCE_URL) is higher
+  # than profile YAML, so CI env vars silently override this file, causing
+  # Hibernate to send PostgreSQL-specific DDL ("set client_min_messages")
+  # to H2 → CommandAcceptanceException → ApplicationContext boot failure →
+  # every integration test fails with "ApplicationContext failure threshold exceeded".
   datasource:
-    url: jdbc:postgresql://localhost:5432/research_hub
-    driver-class-name: org.postgresql.Driver
-    username: user_name
-    password: password123
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  # ── JPA / Hibernate ───────────────────────────────────────────────────────
   jpa:
     hibernate:
       ddl-auto: create-drop
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
-    show-sql: true
-  thymeleaf:
-    cache: false
+    # database-platform alone is not enough — also set the legacy property
+    # so Hibernate 6 picks it up correctly alongside Spring's auto-detection.
+    database-platform: org.hibernate.dialect.H2Dialect
+    properties:
+      hibernate:
+        # Explicit dialect override prevents PostgreSQLDialect from leaking in
+        # via main application.properties when the context is shared.
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+    show-sql: false
+
+  # ── H2 Console ────────────────────────────────────────────────────────────
+  h2:
+    console:
+      enabled: false
+
+  # ── Suppress migration tools if on classpath ──────────────────────────────
+  flyway:
+    enabled: false
+  liquibase:
+    enabled: false
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    org.hibernate.tool.schema: ERROR
+    com.kuet.hub: INFO

@@ -29,7 +29,8 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
@@ -44,7 +45,25 @@ public class SecurityConfig {
         http
                 .authenticationProvider(authenticationProvider())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/auth/register", "/auth/login", "/css/**", "/js/**", "/images/**").permitAll()
+                        .requestMatchers(
+                                "/",
+                                "/auth/register",
+                                "/auth/login",
+                                "/css/**",
+                                "/js/**",
+                                "/lib/**",
+                                "/images/**",
+                                // FIX: Browsers auto-request favicon.ico on every page load.
+                                // Without this, Spring Security intercepts the request,
+                                // finds no static file, and throws NoResourceFoundException
+                                // which the GlobalExceptionHandler catches as a 500.
+                                "/favicon.ico",
+                                // Also permit other common browser auto-requests
+                                "/robots.txt",
+                                "/error"
+                        ).permitAll()
+                        .requestMatchers("/browse", "/browse/**", "/my-requests", "/my-requests/**").hasRole("BORROWER")
+                        .requestMatchers("/requests/**").authenticated()
                         .requestMatchers("/provider/**").hasRole("PROVIDER")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

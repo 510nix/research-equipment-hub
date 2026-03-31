@@ -17,6 +17,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null")
 class RegisterUser_ProviderRole_Test {
 
     @Mock private UserRepository userRepository;
