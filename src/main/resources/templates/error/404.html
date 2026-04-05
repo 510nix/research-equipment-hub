@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found – Research Hub</title>
+    <link rel="stylesheet" href="/lib/bootstrap.min.css" th:href="@{/lib/bootstrap.min.css}">
+    <link rel="stylesheet" href="/css/main.css" th:href="@{/css/main.css}">
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 p-5 text-center">
+                <div class="card-body">
+                    <!-- Error Icon and Status Code -->
+                    <div class="mb-4">
+                        <h1 class="display-1 text-warning mb-2">404</h1>
+                        <h2 class="h3 fw-bold text-dark" th:text="${errorTitle ?: 'Page Not Found'}">
+                            Page Not Found
+                        </h2>
+                    </div>
+
+                    <!-- Error Message -->
+                    <p class="text-muted fs-5 mb-4"
+                       th:text="${errorMessage ?: 'The page you are looking for does not exist or has been moved.'}">
+                        The page you are looking for does not exist or has been moved.
+                    </p>
+
+                    <!-- Additional Context -->
+                    <div class="alert alert-info mb-4" role="alert">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            The resource may have been deleted, moved, or the URL might be incorrect.
+                        </small>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-center gap-3 mt-4">
+                        <a th:href="@{/dashboard}" class="btn btn-primary">
+                            <i class="bi bi-house-fill"></i> Go to Dashboard
+                        </a>
+                        <a th:href="@{/browse}" class="btn btn-outline-secondary">
+                            <i class="bi bi-search"></i> Browse Equipment
+                        </a>
+                        <button onclick="history.back()" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Go Back
+                        </button>
+                    </div>
+
+                    <!-- Timestamp (for debugging) -->
+                    <hr class="my-4">
+                    <small class="text-muted" th:if="${timestamp}">
+                        Error ID: <code th:text="${'ERR-' + timestamp}">ERR-XXX</code>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/lib/bootstrap.bundle.min.js" th:src="@{/lib/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

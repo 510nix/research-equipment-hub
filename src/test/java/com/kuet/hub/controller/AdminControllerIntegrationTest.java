@@ -106,11 +106,12 @@ class AdminControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /admin/dashboard - Borrower receives 403 Forbidden")
+    @DisplayName("GET /admin/dashboard - Borrower receives 302 Redirect to Access Denied")
     @WithMockUser(username = "borrower_user", roles = {"BORROWER"})
     void testAdminDashboard_BorrowerUser_Returns403() throws Exception {
         mockMvc.perform(get("/admin/dashboard"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/access-denied"));
     }
 
     @Test
@@ -135,11 +136,12 @@ class AdminControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("GET /admin/categories - Borrower receives 403 Forbidden")
+    @DisplayName("GET /admin/categories - Borrower receives 302 Redirect to Access Denied")
     @WithMockUser(username = "borrower_user", roles = {"BORROWER"})
     void testListCategories_BorrowerUser_Returns403() throws Exception {
         mockMvc.perform(get("/admin/categories"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/access-denied"));
     }
 
     @Test
@@ -158,14 +160,15 @@ class AdminControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /admin/categories/new - Borrower receives 403 Forbidden")
+    @DisplayName("POST /admin/categories/new - Borrower receives 302 Redirect to Access Denied")
     @WithMockUser(username = "borrower_user", roles = {"BORROWER"})
     void testCreateCategory_BorrowerUser_Returns403() throws Exception {
         mockMvc.perform(post("/admin/categories/new")
                 .with(csrf())
                 .param("name", "Test Category")
                 .param("description", "Test description"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/access-denied"));
     }
 
     @Test
@@ -183,11 +186,12 @@ class AdminControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("POST /admin/users/{id}/toggle-status - Borrower receives 403 Forbidden")
+    @DisplayName("POST /admin/users/{id}/toggle-status - Borrower receives 302 Redirect to Access Denied")
     @WithMockUser(username = "borrower_user", roles = {"BORROWER"})
     void testToggleUserStatus_BorrowerUser_Returns403() throws Exception {
         mockMvc.perform(post("/admin/users/{id}/toggle-status", adminUser.getId())
                 .with(csrf()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/access-denied"));
     }
 }
