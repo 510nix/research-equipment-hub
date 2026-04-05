@@ -76,3 +76,20 @@ jobs:
           SPRING_DATASOURCE_USERNAME: user_name
           SPRING_DATASOURCE_PASSWORD: password123
           SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+
+      # ── Step 3: Deploy to Render (only on push to main) ───────────────────
+      #
+      # Render provides a deploy hook URL that triggers a new deployment.
+      # The URL is stored as a GitHub secret (RENDER_DEPLOY_HOOK_URL) so it
+      # is never exposed in the workflow file.
+      #
+      # This step is skipped for pull_request events and pushes to non-main
+      # branches — tests and builds still run, but deployment only happens
+      # when code lands on main.
+      - name: Deploy to Render
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          curl --silent --show-error --fail \
+            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
