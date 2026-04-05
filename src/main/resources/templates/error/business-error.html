@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operation Not Allowed – Research Hub</title>
+    <link rel="stylesheet" href="/lib/bootstrap.min.css" th:href="@{/lib/bootstrap.min.css}">
+    <link rel="stylesheet" href="/css/main.css" th:href="@{/css/main.css}">
+</head>
+<body>
+<div th:replace="~{fragments/navbar :: navbar}"></div>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 p-5">
+                <div class="card-body">
+                    <!-- Error Icon and Status Code -->
+                    <div class="mb-4 text-center">
+                        <h1 class="display-4 mb-2">
+                            <span th:if="${errorCode == 422}">⚠️</span>
+                        </h1>
+                        <h2 class="h3 fw-bold text-dark" th:text="${errorTitle ?: 'Operation Not Allowed'}">
+                            Operation Not Allowed
+                        </h2>
+                    </div>
+
+                    <!-- Error Message (Specific Reason) -->
+                    <div class="alert alert-warning border-2 border-warning-subtle mb-4" role="alert">
+                        <h5 class="alert-heading fw-bold mb-3">Why you're seeing this:</h5>
+                        <p class="mb-0 text-dark" th:text="${errorMessage ?: 'The operation you attempted cannot be completed at this time.'}">
+                            The operation you attempted cannot be completed at this time.
+                        </p>
+                    </div>
+
+                    <!-- Context-Specific Advice -->
+                    <div class="row">
+                        <!-- Item Cannot Be Deleted - Dependency Lock -->
+                        <div th:if="${errorMessage and errorMessage.contains('borrowed')}" class="col-12 mb-3">
+                            <div class="alert alert-info mb-0">
+                                <strong>💡 Tip:</strong> An item currently on loan cannot be deleted or modified.
+                                <br/><small class="mt-2 d-block">The borrower must first return the equipment before you can delete it.</small>
+                            </div>
+                        </div>
+
+                        <!-- User Cannot Be Disabled - Dependency Lock -->
+                        <div th:if="${errorMessage and errorMessage.contains('active')}" class="col-12 mb-3">
+                            <div class="alert alert-info mb-0">
+                                <strong>💡 Tip:</strong> Users with active transactions cannot be disabled.
+                                <br/><small class="mt-2 d-block">Complete all pending requests or returns before disabling this account.</small>
+                            </div>
+                        </div>
+
+                        <!-- Category Cannot Be Deleted -->
+                        <div th:if="${errorMessage and errorMessage.contains('items')}" class="col-12 mb-3">
+                            <div class="alert alert-info mb-0">
+                                <strong>💡 Tip:</strong> This category has equipment linked to it.
+                                <br/><small class="mt-2 d-block">Move equipment to a different category before deleting.</small>
+                            </div>
+                        </div>
+
+                        <!-- Generic Dependency Lock Help -->
+                        <div th:if="${!errorMessage or (!errorMessage.contains('borrowed') and !errorMessage.contains('active') and !errorMessage.contains('items'))}" class="col-12 mb-3">
+                            <div class="alert alert-info mb-0">
+                                <strong>💡 What to do:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Review the error message above carefully</li>
+                                    <li>Complete any prerequisite actions (e.g., returns, approvals)</li>
+                                    <li>Try the operation again</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="mt-4 d-flex justify-content-center gap-2">
+                        <button onclick="history.back()" class="btn btn-primary">
+                            <i class="bi bi-arrow-left"></i> Go Back
+                        </button>
+                        <a th:href="@{/dashboard}" class="btn btn-outline-secondary">
+                            <i class="bi bi-house-fill"></i> Dashboard
+                        </a>
+                    </div>
+
+                    <!-- Additional Info -->
+                    <hr class="my-4"/>
+                    <small class="text-muted text-center d-block">
+                        <strong>Error Code:</strong> <code th:text="${'#' + errorCode}">HTTPStatus</code>
+                        <span th:if="${timestamp}" class="d-block mt-2">
+                            Time: <code th:text="${#dates.format(new java.util.Date(timestamp), 'HH:mm:ss')}">12:00:00</code>
+                        </span>
+                    </small>
+                </div>
+            </div>
+
+            <!-- FAQ Section -->
+            <div class="mt-5">
+                <h5 class="fw-bold mb-3">Common Questions</h5>
+                <div class="accordion accordion-flush" id="faqAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#faq1">
+                                What are "Active Transactions"?
+                            </button>
+                        </h2>
+                        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <p class="mb-0">
+                                    Active transactions include approved borrow requests where equipment is still on loan.
+                                    Complete the return process before disabling the user account.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#faq2">
+                                Can I delete equipment in use?
+                            </button>
+                        </h2>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <p class="mb-0">
+                                    No, equipment cannot be deleted while marked as "Borrowed". The borrower must return it first.
+                                    This prevents data loss and maintains accountability.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#faq3">
+                                What is a Dependency Lock?
+                            </button>
+                        </h2>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <p class="mb-0">
+                                    A dependency lock prevents operations that would leave the system in an inconsistent state.
+                                    It ensures data integrity by blocking deletions/modifications that would violate business rules.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/lib/bootstrap.bundle.min.js" th:src="@{/lib/bootstrap.bundle.min.js}"></script>
+</body>
+</html>
